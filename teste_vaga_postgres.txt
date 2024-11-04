@@ -1,0 +1,159 @@
+TAREFAS
+
+1. Tabela tenant
+
+Identifique as chaves primárias e estrangeiras necessárias para garantir a integridade referencial. Defina-as corretamente.
+
+	CREATE TABLE tenant (
+		tenant_id Integer Primary Key,
+		name VARCHAR(100),
+		description VARCHAR(255)
+	);
+
+	CREATE TABLE person (
+		person_id Integer Primary Key,
+		name VARCHAR(100),
+		birth_date DATE,
+		metadata JSONB
+	);
+		
+	CREATE TABLE institution (
+    institution_id Integer primary Key,
+    name VARCHAR(100),
+    location VARCHAR(100),
+    tenant_id Integer Not Null,
+	details JSONB
+	);
+
+	CREATE TABLE course (
+    course_id Integer primary Key,
+    tenant_id INTEGER Not Null,
+    institution_id INTEGER Not Null,
+    name VARCHAR(100),
+    duration INTEGER,
+	details JSONB
+	);
+	
+	CREATE TABLE enrollment (
+    enrollment_id Integer primary Key,
+    tenant_id INTEGER Not Null,
+    institution_id INTEGER Not Null,
+    person_id INTEGER Not Null,
+    enrollment_date DATE,
+	status VARCHAR(20)
+	);
+	
+2. Construa índices que consideras essenciais para operações básicas do banco e de consultas possíveis para a estrutura sugerida.
+
+	CREATE TABLE person (
+		person_id Integer Primary Key,
+		name VARCHAR(100),
+		birth_date DATE,
+		metadata JSONB
+	);
+
+	Create Index Idx_Person ON Person (id_Person);
+	
+	CREATE TABLE enrollment (
+    id SERIAL PRIMARY KEY,
+    tenant VARCHAR(255) NOT NULL,
+    institution VARCHAR(255),
+    person_id INT NOT NULL,
+    UNIQUE (tenant, institution, person_id)
+	);
+
+	CREATE UNIQUE INDEX unique_enrollment  ON enrollment (tenant, COALESCE(institution, 'NULL_VALUE'), person_id);
+
+3. Caso eu queira incluir conceitos de exclusão lógica na tabela enrollment. Como eu poderia fazer? Quais as alterações necessárias nas definições anteriores?
+
+	CREATE TABLE enrollment (
+    id SERIAL PRIMARY KEY,
+    tenant VARCHAR NOT NULL,
+    institution VARCHAR,
+    person_id INT NOT NULL,
+    UNIQUE (tenant, institution, person_id)
+   );
+	
+	CREATE UNIQUE INDEX idx_unique_enrollment ON enrollment (tenant, institution, person_id);
+
+4. Caso eu queira incluir conceitos de exclusão lógica na tabela enrollment. Como eu poderia fazer? Quais as alterações necessárias nas definições anteriores?
+
+	ALTER TABLE enrollment ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
+	
+	UPDATE enrollment SET is_deleted = TRUE WHERE id = ?;
+
+5. Construa uma consulta que retorne o número de matrículas por curso em uma determinada instituição.Filtre por tenant_id e institution_id obrigatoriamente. Filtre também por uma busca qualquer -full search - no campo metadata da tabela person que contém informações adicionais no formato JSONB. Considere aqui também a exclusão lógica e exiba somente registros válidos.
+
+
+	SELECT 
+	c.course_name, 
+	COUNT(m.id) AS enrollment_count 
+		FROM
+	 enrollments m JOIN curse c ON m.course_id = c.id 
+		JOIN persons p ON m.person_id = p.id
+		WHERE m.tenant_id = '1' 
+	AND m.institution_id = '2'
+	AND p.metadata @> '{"name": "maria"}' -- Altere "search_key" e "seu_termo_de_busca" conforme necessário 
+	AND m.deleted_at IS NULL -- Exclude logically deleted records 
+		GROUP BY 
+	c.course_name 
+		ORDER BY
+	enrollment_count DESC;
+
+
+6
+
+SELECT 
+    a.id AS person_id,
+    a.name AS person_name,
+    c.id AS course_id,
+    c.name AS course_name,
+    t.id AS tenant_id,
+    t.name AS tenant_name,
+    i.id AS institution_id,
+    i.name AS institution_name
+FROM 
+    persons a
+JOIN 
+    curse c ON a.course_id = c.id
+JOIN 
+    tenants t ON c.tenant_id = t.id
+JOIN 
+    institutions i ON t.institution_id = i.id
+WHERE 
+    c.id = :course_id
+    AND t.id = :tenant_id
+    AND i.id = :institution_id
+    AND a.excluido = FALSE -- Considera apenas registros válidos
+ORDER BY 
+    a.name; -- Ordena pelo name do person
+	
+7
+
+CREATE TABLE enrollment (
+    enrollment_id SERIAL PRIMARY KEY,
+    student_id INT NOT NULL,
+    course_id INT NOT NULL,
+    enrollment_date DATE NOT NULL,
+    status VARCHAR(20),
+    -- Outras colunas relevantes
+    CHECK (enrollment_date >= '2020-01-01')  -- Exemplo de restrição de data
+);
+
+-- Particionando a tabela por ano
+CREATE TABLE enrollment_2020 PARTITION OF enrollment FOR VALUES FROM ('2020-01-01') TO ('2021-01-01');
+CREATE TABLE enrollment_2021 PARTITION OF enrollment FOR VALUES FROM ('2021-01-01') TO ('2022-01-01');
+CREATE TABLE enrollment_2022 PARTITION OF enrollment FOR VALUES FROM ('2022-01-01') TO ('2023-01-01');
+CREATE TABLE enrollment_2023 PARTITION OF enrollment FOR VALUES FROM ('2023-01-01') TO ('2024-01-01');
+
+Particionamento Data: A tabela enrollment foi dividida em partições anuais. Cada partição contém os registros do respectivo ano, facilitando a consulta e o gerenciamento de dados.
+
+Chave Primária: O enrollment_id continua a ser a chave primária, garantindo que cada registro seja único.
+
+Verificação de Data: A restrição CHECK garante que apenas registros 
+
+Performance: Com o particionamento, consultas que filtram por ano podem ser mais rápidas
+
+Manutenção: Partições antigas podem ser arquivadas ou removidas
+
+Expansão: Para anos futuros, novas partições podem ser criadas conforme necessário, mantendo a estrutura flexível.
