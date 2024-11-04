@@ -1,0 +1,10 @@
+TESTE_DOIS
+
+CREATE TABLE course (
+    id SERIAL,
+    tenant_id INTEGER,
+    institution_id INTEGER,
+    name VARCHAR(100),
+    duration INTEGER,
+    details JSONB
+);
