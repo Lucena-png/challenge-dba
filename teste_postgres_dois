@@ -1,0 +1,5 @@
+CREATE TABLE tenant (
+    id SERIAL,
+    name VARCHAR(100),
+    description VARCHAR(255)
+);
